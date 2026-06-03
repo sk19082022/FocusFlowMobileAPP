@@ -21,9 +21,26 @@
 
 👉 **Download Latest APK**
 
-[Download APK](#)
+<a href="https://drive.google.com/file/d/1n-iHViH0iAyOQM1e679OTjUC10cWaWnP/view?usp=sharing" download class="download-btn">
+    Download APK
+</a>
 
-*(Replace with your release link later)*
+<style>
+.download-btn {
+    display: inline-block;
+    padding: 12px 24px;
+    background: #e94560;
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: bold;
+    transition: 0.3s;
+}
+
+.download-btn:hover {
+    background: #ff6b6b;
+}
+</style>
 
 ---
 
