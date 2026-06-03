@@ -21,7 +21,7 @@
 
 👉 **Download Latest APK**
 
-[![Download APK](https://img.shields.io/badge/Download-APK-green?style=for-the-badge)](https://your-link-here.com/app.apk)
+[![Download APK](https://img.shields.io/badge/Download-APK-green?style=for-the-badge)](https://drive.google.com/file/d/1n-iHViH0iAyOQM1e679OTjUC10cWaWnP/view?usp=sharing)
 
 ---
 
