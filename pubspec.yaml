@@ -1,0 +1,37 @@
+name: focus_flow
+description: A professional focus and habit tracking app
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.5.3
+  intl: ^0.20.2
+  fl_chart: ^1.2.0
+  table_calendar: ^3.0.9
+  url_launcher: ^6.2.5
+  # Remove workmanager and flutter_local_notifications
+  # workmanager: ^0.5.1  ← Remove this line
+  # flutter_local_notifications: ^17.0.0  ← Remove this line
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.png"
+  adaptive_icon_background: "#1a1a2e"
+  adaptive_icon_foreground: "assets/logo.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png
