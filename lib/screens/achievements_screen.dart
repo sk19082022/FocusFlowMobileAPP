@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/task_service.dart';
+import '../services/todo_service.dart';
 import '../models/achievement.dart';
+import '../models/todo.dart';
 import '../widgets/app_header.dart';
 
 class AchievementsScreen extends StatefulWidget {
@@ -12,18 +14,26 @@ class AchievementsScreen extends StatefulWidget {
 
 class _AchievementsScreenState extends State<AchievementsScreen> {
   List<Achievement> _achievements = [];
+  List<Todo> _completedTodos = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadAchievements();
+    _loadData();
   }
 
-  Future<void> _loadAchievements() async {
+  Future<void> _loadData() async {
     final achievements = await TaskService.loadAchievements();
+    final todos = await TodoService.loadTodos();
+    // Get permanently completed one-time todos
+    final completedTodos = todos.where((t) => 
+      t.isPermanentlyCompleted && !t.isDaily
+    ).toList();
+    
     setState(() {
       _achievements = achievements.reversed.toList();
+      _completedTodos = completedTodos.reversed.toList();
       _isLoading = false;
     });
   }
@@ -34,10 +44,18 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final hasAchievements = _achievements.isNotEmpty || _completedTodos.isNotEmpty;
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: RefreshIndicator(
-        onRefresh: _loadAchievements,
+        onRefresh: _loadData,
         child: CustomScrollView(
           slivers: [
             const SliverToBoxAdapter(child: AppHeader()),
@@ -63,7 +81,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${_achievements.length} tasks completed',
+                      '${_achievements.length + _completedTodos.length} tasks completed',
                       style: const TextStyle(
                         fontSize: 14,
                         color: Colors.grey,
@@ -71,12 +89,46 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
                     ),
                     const SizedBox(height: 24),
                     
-                    if (_isLoading)
-                      const Center(child: CircularProgressIndicator())
-                    else if (_achievements.isEmpty)
+                    if (!hasAchievements)
                       _buildEmptyState()
-                    else
-                      ..._achievements.map((achievement) => _buildAchievementCard(achievement)),
+                    else ...[
+                      if (_achievements.isNotEmpty) ...[
+                        const Text(
+                          'Focus Tasks',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ..._achievements.map((achievement) => _buildAchievementCard(
+                          name: achievement.taskName,
+                          startDate: achievement.createdAt,
+                          completeDate: achievement.completedAt,
+                          details: '🎯 ${achievement.totalDaysTracked} days tracked • ⏱️ ${achievement.focusMinutes} min sessions',
+                        )),
+                        const SizedBox(height: 16),
+                      ],
+                      
+                      if (_completedTodos.isNotEmpty) ...[
+                        const Text(
+                          'Completed Tasks',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ..._completedTodos.map((todo) => _buildAchievementCard(
+                          name: todo.name,
+                          startDate: todo.createdAt,
+                          completeDate: todo.completedDate ?? todo.dueDate,
+                          details: 'One-time task • Completed on time',
+                        )),
+                      ],
+                    ],
                   ],
                 ),
               ),
@@ -87,9 +139,14 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
     );
   }
 
-  Widget _buildAchievementCard(Achievement achievement) {
+  Widget _buildAchievementCard({
+    required String name,
+    required DateTime startDate,
+    required DateTime completeDate,
+    required String details,
+  }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -108,16 +165,16 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
       child: Row(
         children: [
           Container(
-            width: 60,
-            height: 60,
+            width: 50,
+            height: 50,
             decoration: BoxDecoration(
               color: Colors.green.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(25),
             ),
             child: const Icon(
-              Icons.emoji_events,
-              color: Colors.amber,
-              size: 32,
+              Icons.check_circle,
+              color: Colors.green,
+              size: 28,
             ),
           ),
           const SizedBox(width: 16),
@@ -126,9 +183,9 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  achievement.taskName,
+                  name,
                   style: const TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -138,30 +195,30 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
                     const Icon(Icons.calendar_today, size: 12, color: Colors.grey),
                     const SizedBox(width: 4),
                     Text(
-                      'Started: ${_formatDate(achievement.createdAt)}',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      'Started: ${_formatDate(startDate)}',
+                      style: const TextStyle(fontSize: 11, color: Colors.grey),
                     ),
                     const SizedBox(width: 12),
                     const Icon(Icons.check_circle, size: 12, color: Colors.green),
                     const SizedBox(width: 4),
                     Text(
-                      'Completed: ${_formatDate(achievement.completedAt)}',
-                      style: const TextStyle(fontSize: 12, color: Colors.green),
+                      'Completed: ${_formatDate(completeDate)}',
+                      style: const TextStyle(fontSize: 11, color: Colors.green),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '🎯 ${achievement.totalDaysTracked} days tracked • ⏱️ ${achievement.focusMinutes} min sessions',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  details,
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
                 ),
               ],
             ),
           ),
           const Icon(
-            Icons.check_circle,
-            color: Colors.green,
-            size: 28,
+            Icons.emoji_events,
+            color: Colors.amber,
+            size: 24,
           ),
         ],
       ),
@@ -185,7 +242,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            "Complete tasks to earn achievements",
+            "Complete tasks and maintain habits to earn achievements",
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[500],

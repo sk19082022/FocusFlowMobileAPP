@@ -18,15 +18,26 @@ class _TodoScreenState extends State<TodoScreen> {
   @override
   void initState() {
     super.initState();
-    _loadTodos();
+    _loadTodos().then((_) {
+      _checkAndResetDailyHabits();  // ← Add this line
+    });
   }
-
+  
   Future<void> _loadTodos() async {
     final todos = await TodoService.loadTodos();
     setState(() {
       _todos = todos;
       _isLoading = false;
     });
+  }
+
+    void _checkAndResetDailyHabits() {
+    for (var todo in _todos) {
+      if (todo.isDaily) {
+        todo.resetDailyIfNeeded();
+      }
+    }
+    _saveTodos();
   }
 
   Future<void> _saveTodos() async {
@@ -76,15 +87,19 @@ class _TodoScreenState extends State<TodoScreen> {
   }
 
   String _getTodoStatus(Todo todo) {
+    if (todo.isPermanentlyCompleted) return 'completed';
     if (todo.isDaily) return 'daily';
-    if (todo.isCompleted) return 'completed';
-    
-    final today = DateTime.now();
-    final dueDate = DateTime(todo.dueDate.year, todo.dueDate.month, todo.dueDate.day);
-    final normalizedToday = DateTime(today.year, today.month, today.day);
-    
-    if (normalizedToday.isAfter(dueDate)) {
-      return 'overdue';
+    if (todo.isCompleted && !todo.isDaily) return 'completed';
+
+    if (!todo.isDaily && !todo.isCompleted) {
+      final today = DateTime.now();
+      final dueDate = DateTime(todo.dueDate.year, todo.dueDate.month, todo.dueDate.day);
+      final normalizedToday = DateTime(today.year, today.month, today.day);
+
+      if (normalizedToday.isAfter(dueDate)) {
+        return 'overdue';
+      }
+      return 'pending';
     }
     return 'pending';
   }
@@ -248,104 +263,140 @@ class _TodoScreenState extends State<TodoScreen> {
     );
   }
 
-  Widget _buildTodoCard(Todo todo) {
-    final status = _getTodoStatus(todo);
-    final statusColor = _getStatusColor(status);
-    final statusLabel = _getStatusLabel(status);
-    final isCompleted = status == 'completed';
-    final isOverdue = status == 'overdue';
-    final isDaily = todo.isDaily;
-    
-    return GestureDetector(
-      onLongPress: () => _showDeleteDialog(todo),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isOverdue ? Colors.red.withOpacity(0.1) : Colors.grey[900],
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isOverdue ? Colors.red.withOpacity(0.3) : Colors.grey[800]!,
-          ),
-        ),
-        child: Row(
-          children: [
-            GestureDetector(
-              onTap: () => _toggleTodo(todo),
-              child: Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isCompleted ? Colors.green : Colors.transparent,
-                  border: Border.all(
-                    color: isCompleted ? Colors.green : Colors.grey,
-                    width: 2,
-                  ),
-                ),
-                child: isCompleted
-                    ? const Icon(Icons.check, size: 16, color: Colors.white)
-                    : null,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    todo.name,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      decoration: isCompleted ? TextDecoration.lineThrough : null,
-                      color: isCompleted ? Colors.grey : Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        isDaily ? Icons.repeat : Icons.calendar_today,
-                        size: 12,
-                        color: Colors.grey[600],
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        isDaily ? "Daily" : _formatDate(todo.dueDate),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isOverdue ? Colors.red : Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: statusColor.withOpacity(0.3),
-                ),
-              ),
-              child: Text(
-                isDaily ? "${todo.completedDates.length} days" : statusLabel,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: statusColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
+Widget _buildTodoCard(Todo todo) {
+  final status = _getTodoStatus(todo);
+  final statusColor = _getStatusColor(status);
+  final statusLabel = _getStatusLabel(status);
+  final isCompleted = status == 'completed';
+  final isOverdue = status == 'overdue';
+  final isDaily = todo.isDaily;
+  final isPermanentlyCompleted = todo.isPermanentlyCompleted;
+  final isTodayCompleted = todo.isCompletedForToday();
+  
+  // For daily habits, check if already completed today
+  final canToggle = isDaily ? !isTodayCompleted : !isPermanentlyCompleted;
+  
+  return GestureDetector(
+    onLongPress: isPermanentlyCompleted ? null : () => _showDeleteDialog(todo),
+    child: Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isOverdue ? Colors.red.withOpacity(0.1) : Colors.grey[900],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isOverdue ? Colors.red.withOpacity(0.3) : Colors.grey[800]!,
         ),
       ),
-    );
-  }
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: canToggle ? () => _toggleTodo(todo) : null,
+            child: Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: (isCompleted || (isDaily && isTodayCompleted)) 
+                    ? Colors.green 
+                    : Colors.transparent,
+                border: Border.all(
+                  color: (isCompleted || (isDaily && isTodayCompleted)) 
+                      ? Colors.green 
+                      : Colors.grey,
+                  width: 2,
+                ),
+              ),
+              child: (isCompleted || (isDaily && isTodayCompleted))
+                  ? const Icon(Icons.check, size: 16, color: Colors.white)
+                  : null,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  todo.name,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    decoration: (isCompleted || (isDaily && isTodayCompleted)) 
+                        ? TextDecoration.lineThrough 
+                        : null,
+                    color: (isCompleted || (isDaily && isTodayCompleted)) 
+                        ? Colors.grey 
+                        : Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      isDaily ? Icons.repeat : Icons.calendar_today,
+                      size: 12,
+                      color: Colors.grey[600],
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isDaily ? "Daily" : _formatDate(todo.dueDate),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isOverdue ? Colors.red : Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+                if (isDaily && isTodayCompleted)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      "Completed Today ✓",
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.green[400],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                if (isPermanentlyCompleted && todo.completedDate != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      "Completed on: ${_formatDate(todo.completedDate!)}",
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: statusColor.withOpacity(0.3),
+              ),
+            ),
+            child: Text(
+              isDaily ? "${todo.completedDates.length} days" : statusLabel,
+              style: TextStyle(
+                fontSize: 10,
+                color: statusColor,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
   Widget _buildEmptyState() {
     return Center(

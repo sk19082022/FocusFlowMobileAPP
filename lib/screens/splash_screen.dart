@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'main_navigation_screen.dart';
+import '../services/todo_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -69,8 +70,35 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     super.dispose();
   }
 
-  void _navigateToHome() {
+  Future<void> _resetDailyHabits() async {
+    try {
+      final todos = await TodoService.loadTodos();
+      bool needsUpdate = false;
+      
+      for (var todo in todos) {
+        if (todo.isDaily) {
+          final oldCompletedState = todo.isCompleted;
+          todo.resetDailyIfNeeded();
+          if (oldCompletedState != todo.isCompleted) {
+            needsUpdate = true;
+          }
+        }
+      }
+      
+      if (needsUpdate) {
+        await TodoService.saveTodos(todos);
+        debugPrint('Daily habits reset successfully');
+      }
+    } catch (e) {
+      debugPrint('Error resetting daily habits: $e');
+    }
+  }
+
+  void _navigateToHome() async {
     if (mounted) {
+      // Reset daily habits before navigating
+      await _resetDailyHabits();
+      
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(

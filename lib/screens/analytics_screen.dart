@@ -83,7 +83,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   int get totalFocusMinutes {
-    return _tasks.fold(0, (sum, task) => sum + (task.focusMinutes * task.doneDays));
+    return _tasks.fold(0, (sum, task) => sum + task.totalFocusMinutes);
   }
 
   @override
